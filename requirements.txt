@@ -1,0 +1,26 @@
+# Core ML / OCR
+transformers>=4.40.0
+datasets>=2.19.0
+evaluate>=0.4.0
+accelerate>=0.30.0
+
+# Image processing
+Pillow>=10.0.0
+opencv-python>=4.9.0
+
+# Utilities
+numpy>=1.26.0
+tqdm>=4.66.0
+scikit-learn>=1.4.0
+matplotlib>=3.8.0
+
+# Hugging Face Hub (model downloading)
+huggingface_hub>=0.23.0
+
+# Metrics
+jiwer>=3.0.0
+
+# --- PyTorch (CUDA 12.4 for RTX 4050) ---
+# Install separately with:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+# Or run: python install_torch.py

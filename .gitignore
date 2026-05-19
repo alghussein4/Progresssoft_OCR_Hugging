@@ -1,0 +1,52 @@
+# Virtual environments
+.ProgresssoftOCRHuggingVenv/
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Models & checkpoints (large files — store on HuggingFace Hub instead)
+outputs/
+checkpoints/
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# Datasets (large — use HuggingFace Datasets or store separately)
+data/raw/
+data/processed/
+
+# Logs
+logs/
+*.log
+runs/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Environment variables
+.env
+.env.local
+
+# HuggingFace cache
+.cache/
