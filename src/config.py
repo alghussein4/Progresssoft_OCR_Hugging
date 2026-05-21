@@ -38,9 +38,9 @@ def get_config() -> dict:
         "model_id":         "microsoft/trocr-base-handwritten",
 
         # Training
-        "epochs":           30,
+        "epochs":           50,
         "batch_size":       batch_size,
-        "learning_rate":    5e-5,
+        "learning_rate":    1e-5,
         "weight_decay":     0.01,
         "warmup_steps":     500,
 
