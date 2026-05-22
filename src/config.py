@@ -42,7 +42,7 @@ def get_config() -> dict:
         "model_id":          model_id,
 
         # Training
-        "epochs":            50,
+        "epochs":            20,
         "batch_size":        batch_size,
         "learning_rate":     5e-6,
         "weight_decay":      0.01,
