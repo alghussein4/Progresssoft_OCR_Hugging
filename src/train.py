@@ -20,7 +20,7 @@ from torch.optim import AdamW
 from transformers import (
     TrOCRProcessor,
     VisionEncoderDecoderModel,
-    get_linear_schedule_with_warmup,
+    get_cosine_schedule_with_warmup,
 )
 
 from src.config import get_config
@@ -105,7 +105,7 @@ def train():
     )
 
     total_steps   = len(train_loader) * epochs
-    scheduler     = get_linear_schedule_with_warmup(
+    scheduler     = get_cosine_schedule_with_warmup(
         optimizer,
         num_warmup_steps=cfg["warmup_steps"],
         num_training_steps=total_steps,

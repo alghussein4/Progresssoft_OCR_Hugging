@@ -1,15 +1,33 @@
 """
 IAM Line Dataset loader for TrOCR fine-tuning.
 Loads directly from Hugging Face — no manual downloading needed.
+Applies data augmentation on the training split to prevent overfitting.
 
 Usage:
-    python src/dataset.py   # runs a quick sanity check
+    python -m src.dataset   # runs a quick sanity check
 """
 
 from torch.utils.data import Dataset
 from datasets import load_dataset
 from transformers import TrOCRProcessor
 from PIL import Image
+import torchvision.transforms as T
+
+
+# ── Augmentation pipeline (training only) ────────────────────────────────────
+# Applied BEFORE the TrOCR processor so images still get properly normalized.
+# Kept subtle — we don't want to distort the text beyond recognition.
+TRAIN_AUGMENT = T.Compose([
+    T.RandomApply([T.RandomRotation(degrees=3, fill=255)],        p=0.5),
+    T.RandomApply([T.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0))], p=0.3),
+    T.RandomApply([T.ColorJitter(brightness=0.3, contrast=0.3)],  p=0.5),
+    T.RandomApply([T.RandomAffine(
+        degrees=0,
+        translate=(0.02, 0.02),
+        shear=3,
+        fill=255
+    )], p=0.4),
+])
 
 
 class IAMDataset(Dataset):
@@ -24,10 +42,11 @@ class IAMDataset(Dataset):
             f"Invalid split '{split}'. Choose from: train, validation, test"
 
         print(f"Loading IAM-line [{split}] from Hugging Face...")
-        self.dataset          = load_dataset("Teklia/IAM-line", split=split)
-        self.processor        = processor
+        self.dataset           = load_dataset("Teklia/IAM-line", split=split)
+        self.processor         = processor
         self.max_target_length = max_target_length
-        print(f"  Loaded {len(self.dataset)} samples.")
+        self.augment           = (split == "train")   # only augment training data
+        print(f"  Loaded {len(self.dataset)} samples.  Augmentation: {self.augment}")
 
     def __len__(self):
         return len(self.dataset)
@@ -40,6 +59,10 @@ class IAMDataset(Dataset):
         if not isinstance(image, Image.Image):
             image = Image.fromarray(image)
         image = image.convert("RGB")
+
+        # Apply augmentation on training split only
+        if self.augment:
+            image = TRAIN_AUGMENT(image)
 
         pixel_values = self.processor(
             images=image,
@@ -82,5 +105,6 @@ if __name__ == "__main__":
         print(f"  pixel_values     : {sample['pixel_values'].shape}")
         print(f"  labels shape     : {sample['labels'].shape}")
         print(f"  Sample text      : {raw_text!r}")
+        print(f"  Augmentation     : {ds.augment}")
 
     print("\nDataset check passed.")
