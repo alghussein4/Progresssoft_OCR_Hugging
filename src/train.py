@@ -66,6 +66,9 @@ def train():
     processor = TrOCRProcessor.from_pretrained(cfg["model_id"])
     model     = VisionEncoderDecoderModel.from_pretrained(model_src).to(device)
 
+    # Gradient checkpointing — trades compute for VRAM (essential for large model)
+    model.gradient_checkpointing_enable()
+
     # Required TrOCR config
     model.config.decoder_start_token_id = processor.tokenizer.cls_token_id
     model.config.pad_token_id           = processor.tokenizer.pad_token_id

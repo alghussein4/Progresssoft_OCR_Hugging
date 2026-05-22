@@ -22,9 +22,9 @@ def get_config() -> dict:
 
     if vram >= 14:
         # RTX 4070 Ti Super (16GB)
-        # Large model is heavier — batch size 8 keeps us safely under 16GB VRAM
+        # Large model is heavy — batch size 4 + gradient checkpointing stays safe
         model_id    = "microsoft/trocr-large-handwritten"
-        batch_size  = 8
+        batch_size  = 4
         num_workers = 0 if is_windows else 4
     elif vram >= 6:
         # RTX 4050 Laptop (6GB) — use base model, large won't fit
