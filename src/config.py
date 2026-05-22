@@ -44,9 +44,9 @@ def get_config() -> dict:
         # Training
         "epochs":            50,
         "batch_size":        batch_size,
-        "learning_rate":     2e-5,
+        "learning_rate":     5e-6,
         "weight_decay":      0.01,
-        "warmup_steps":      1000,
+        "warmup_steps":      200,
 
         # Data
         "max_target_length": 128,
