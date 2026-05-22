@@ -16,17 +16,28 @@ import torchvision.transforms as T
 
 # ── Augmentation pipeline (training only) ────────────────────────────────────
 # Applied BEFORE the TrOCR processor so images still get properly normalized.
-# Kept subtle — we don't want to distort the text beyond recognition.
+# Strong enough to prevent overfitting, subtle enough to not destroy text.
 TRAIN_AUGMENT = T.Compose([
-    T.RandomApply([T.RandomRotation(degrees=3, fill=255)],        p=0.5),
-    T.RandomApply([T.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0))], p=0.3),
-    T.RandomApply([T.ColorJitter(brightness=0.3, contrast=0.3)],  p=0.5),
+    # Slight rotation — handwriting is never perfectly straight
+    T.RandomApply([T.RandomRotation(degrees=4, fill=255)],            p=0.6),
+    # Blur — simulates low quality scans
+    T.RandomApply([T.GaussianBlur(kernel_size=3, sigma=(0.1, 1.5))],  p=0.4),
+    # Brightness/contrast — different scanner settings
+    T.RandomApply([T.ColorJitter(brightness=0.4, contrast=0.4)],      p=0.6),
+    # Affine — slight shear and translation
     T.RandomApply([T.RandomAffine(
         degrees=0,
-        translate=(0.02, 0.02),
-        shear=3,
+        translate=(0.03, 0.03),
+        shear=4,
         fill=255
-    )], p=0.4),
+    )], p=0.5),
+    # Random erase — simulates ink smudges or torn paper
+    T.RandomApply([T.RandomErasing(
+        p=1.0,
+        scale=(0.01, 0.03),
+        ratio=(0.3, 3.0),
+        value=255
+    )], p=0.3),
 ])
 
 
