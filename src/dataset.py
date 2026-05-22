@@ -31,13 +31,6 @@ TRAIN_AUGMENT = T.Compose([
         shear=4,
         fill=255
     )], p=0.5),
-    # Random erase — simulates ink smudges or torn paper
-    T.RandomApply([T.RandomErasing(
-        p=1.0,
-        scale=(0.01, 0.03),
-        ratio=(0.3, 3.0),
-        value=255
-    )], p=0.3),
 ])
 
 
