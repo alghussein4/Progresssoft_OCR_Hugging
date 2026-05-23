@@ -60,7 +60,7 @@ This installs PyTorch with CUDA 12.4 support, compatible with RTX 30xx and 40xx 
 
 The fine-tuned handwriting model weights are **not included** in the repository due to their size (~1.2 GB).
 
-1. Download `best_model.zip` from the provided Google Drive link
+1. Download `best_model.zip` from (https://drive.google.com/file/d/13M-IESNkiscr7OB1tMez3ft94Gf8g7HU/view?usp=sharing)
 2. Extract it into the project at this exact path:
 
 ```
