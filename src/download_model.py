@@ -10,7 +10,6 @@ from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 
 MODELS = [
     "microsoft/trocr-base-handwritten",
-    "microsoft/trocr-base-printed",
     "microsoft/trocr-large-handwritten",
 ]
 

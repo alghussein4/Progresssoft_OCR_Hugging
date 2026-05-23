@@ -20,6 +20,12 @@ huggingface_hub>=0.23.0
 # Metrics
 jiwer>=3.0.0
 
+# Printed OCR
+easyocr>=1.7.0
+
+# UI
+gradio>=4.0.0
+
 # --- PyTorch (CUDA 12.4 for RTX 4050) ---
 # Install separately with:
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
