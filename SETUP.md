@@ -133,3 +133,7 @@ python -m ensurepip --upgrade
 **EasyOCR download fails:**
 - Check your internet connection
 - Re-run `python -m src.app` — it will retry automatically
+
+
+
+## We wish you the best using the OCR 😊
