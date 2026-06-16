@@ -1,117 +1,125 @@
 """
-Handwritten text recognition using PaddleOCR.
+Hybrid handwritten text recognition.
 
-PaddleOCR performs its own robust text detection (locating each line/word)
-and recognition, so no manual line segmentation is required — this is what
-makes it read arbitrary images reliably.
+  PaddleOCR  →  detection (finds line/word boxes on arbitrary images)
+  TrOCR      →  recognition (reads each crop — strong on free/cursive writing)
 
-If a fine-tuned recognition model is present at models/paddle_rec/, it is
-used automatically. Otherwise PaddleOCR's pretrained English recognizer is
-used as a fallback.
+PaddleOCR alone was the weak link on handwriting recognition; TrOCR-large is
+purpose-built for it. PaddleOCR is kept only as the detector, where it's strong.
+TrOCR runs on GPU in fp16 (see trocr_recognizer); detection stays on CPU.
 """
 
+# torch / TrOCR MUST be imported before paddleocr — loading torch after paddle
+# triggers a Windows DLL conflict (shm.dll fails to load).
+import torch  # noqa: F401
+from src.models.trocr_recognizer import TrOCRRecognizer
+
 import numpy as np
-from pathlib import Path
+import cv2
 from PIL import Image
+from collections import defaultdict
 from paddleocr import PaddleOCR
 
-REC_MODEL_DIR = "models/paddle_rec"
-_MAX_SIDE = 1800   # downscale images whose longest side exceeds this
+_MAX_SIDE = 1800     # downscale huge photos before detection
+_CHUNK    = 8        # crops per TrOCR batch (bounded for 6 GB VRAM)
 
 
 def _downscale(image: Image.Image) -> Image.Image:
-    """Shrink very large photos so CPU inference stays fast and responsive."""
     w, h = image.size
     longest = max(w, h)
     if longest <= _MAX_SIDE:
         return image
-    scale = _MAX_SIDE / float(longest)
-    return image.resize((int(w * scale), int(h * scale)))
+    s = _MAX_SIDE / float(longest)
+    return image.resize((int(w * s), int(h * s)))
 
 
-def _reading_order_lines(items) -> list:
-    """
-    Order detected word-boxes into natural reading order:
-    group boxes into text lines by vertical position, then sort each line
-    left-to-right. Returns a list of line strings.
-    """
-    if not items:
-        return []
+def _four_point_crop(img_bgr, box):
+    """Perspective-rectify a 4-point detection box into an upright BGR crop."""
+    box = np.array(box, dtype="float32")
+    w = int(max(np.linalg.norm(box[0] - box[1]), np.linalg.norm(box[2] - box[3])))
+    h = int(max(np.linalg.norm(box[0] - box[3]), np.linalg.norm(box[1] - box[2])))
+    if w < 2 or h < 2:
+        return None
+    dst = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype="float32")
+    M = cv2.getPerspectiveTransform(box, dst)
+    return cv2.warpPerspective(img_bgr, M, (w, h))
 
-    def top(it):    return min(p[1] for p in it[0])
-    def left(it):   return min(p[0] for p in it[0])
-    def height(it): return max(p[1] for p in it[0]) - min(p[1] for p in it[0])
 
-    items = [it for it in items if it[1][0].strip()]
-    if not items:
-        return []
+def _line_groups(boxes) -> list:
+    """Group detection boxes into reading order: lines top-to-bottom, each line
+    sorted left-to-right. Returns a list of lines (each a list of boxes)."""
+    def top(b):    return min(p[1] for p in b)
+    def left(b):   return min(p[0] for p in b)
+    def height(b): return max(p[1] for p in b) - min(p[1] for p in b)
 
-    med_h = float(np.median([height(it) for it in items])) or 10.0
-    items.sort(key=top)
+    boxes = sorted(boxes, key=top)
+    med_h = float(np.median([height(b) for b in boxes])) or 10.0
 
-    lines, current, anchor = [], [], top(items[0])
-    for it in items:
-        if it is items[0] or top(it) - anchor < med_h * 0.6:
-            current.append(it)
+    lines, current, anchor = [], [boxes[0]], top(boxes[0])
+    for b in boxes[1:]:
+        if top(b) - anchor < med_h * 0.6:
+            current.append(b)
         else:
             lines.append(current)
-            current = [it]
-            anchor = top(it)
-    if current:
-        lines.append(current)
+            current, anchor = [b], top(b)
+    lines.append(current)
 
-    out = []
     for line in lines:
-        line.sort(key=left)                       # left-to-right within the line
-        out.append(" ".join(it[1][0].strip() for it in line))
-    return out
+        line.sort(key=left)
+    return lines
 
 
 class HandwrittenOCR:
     def __init__(self, use_gpu: bool = False):
-        kwargs = dict(
-            use_angle_cls=True,
-            lang="en",
-            show_log=False,
-            use_gpu=use_gpu,
-        )
-
-        if Path(REC_MODEL_DIR).exists():
-            kwargs["rec_model_dir"] = REC_MODEL_DIR
-            print(f"[Handwritten] Using fine-tuned recognizer: {REC_MODEL_DIR}")
-        else:
-            print("[Handwritten] Fine-tuned recognizer not found — "
-                  "using PaddleOCR pretrained English model.")
-
-        print("[Handwritten] Loading PaddleOCR...")
-        self.ocr = PaddleOCR(**kwargs)
-        print("[Handwritten] Ready.")
+        # PaddleOCR is used for DETECTION only.
+        print("[Handwritten] Loading PaddleOCR detector...")
+        # Higher detection resolution + lower thresholds so faint/thin ink is
+        # found (safe now that the pyarrow segfault — not this — is fixed).
+        self.detector = PaddleOCR(use_angle_cls=False, lang="en",
+                                  show_log=False, use_gpu=use_gpu,
+                                  det_limit_side_len=1920,
+                                  det_db_box_thresh=0.3, det_db_thresh=0.2)
+        # TrOCR does the recognition.
+        self.recognizer = TrOCRRecognizer()
+        print("[Handwritten] Hybrid ready (Paddle detect + TrOCR read).")
 
     def read_image(self, image: Image.Image) -> str:
-        """
-        Detect and read all text in a full image.
-        Returns the recognized lines joined top-to-bottom in reading order.
-        """
-        image = _downscale(image)          # cap huge phone photos for speed
-        img    = np.array(image.convert("RGB"))
-        result = self.ocr.ocr(img, cls=True)
+        """Detect lines with PaddleOCR, read each with TrOCR, return ordered text."""
+        image   = _downscale(image)
+        img_bgr = np.ascontiguousarray(np.array(image.convert("RGB"))[:, :, ::-1])
 
-        # result is [ [ [box, (text, conf)], ... ] ] — None if nothing found
-        if not result or result[0] is None:
+        boxes, _ = self.detector.text_detector(img_bgr)
+        if boxes is None or len(boxes) == 0:
             return ""
 
-        return "\n".join(_reading_order_lines(result[0]))
+        lines = _line_groups(boxes)
+
+        # Crop every box in reading order, tracking which line it belongs to.
+        items = []   # (line_index, PIL crop)
+        for li, line in enumerate(lines):
+            for box in line:
+                crop = _four_point_crop(img_bgr, box)
+                if crop is not None and crop.size:
+                    items.append((li, Image.fromarray(crop[:, :, ::-1])))  # BGR->RGB
+
+        if not items:
+            return ""
+
+        # Read crops with TrOCR in memory-bounded chunks.
+        texts = []
+        for i in range(0, len(items), _CHUNK):
+            chunk = [c for _, c in items[i:i + _CHUNK]]
+            texts.extend(self.recognizer.read_batch(chunk))
+
+        # Reassemble: words within a line joined by space, lines by newline.
+        line_words = defaultdict(list)
+        for (li, _), txt in zip(items, texts):
+            if txt.strip():
+                line_words[li].append(txt.strip())
+
+        return "\n".join(" ".join(line_words[li])
+                         for li in range(len(lines)) if line_words[li])
 
     def read_crop(self, image: Image.Image) -> str:
-        """
-        Recognize a pre-cropped single line/word (detection skipped).
-        Used by the mixed-document pipeline for regions already located.
-        """
-        img    = np.array(image.convert("RGB"))
-        result = self.ocr.ocr(img, det=False, cls=True)
-
-        if not result or not result[0]:
-            return ""
-
-        text, _ = result[0][0]
-        return text.strip()
+        """Recognize a single pre-cropped region (used by the mixed pipeline)."""
+        return self.recognizer.read_crop(image)
