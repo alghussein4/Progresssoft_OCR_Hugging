@@ -6,10 +6,14 @@ accelerate>=0.30.0
 
 # Image processing
 Pillow>=10.0.0
-opencv-python>=4.9.0
+# OpenCV + numpy MUST stay on the numpy-1.x line — PaddlePaddle 2.6.2 is
+# compiled against numpy 1.x and crashes (ABI error) with numpy 2.x.
+opencv-python==4.10.0.84
+opencv-python-headless==4.10.0.84
+tifffile==2024.8.30
 
 # Utilities
-numpy>=1.26.0
+numpy==1.26.4
 tqdm>=4.66.0
 scikit-learn>=1.4.0
 matplotlib>=3.8.0
@@ -22,6 +26,15 @@ jiwer>=3.0.0
 
 # Printed OCR
 easyocr>=1.7.0
+
+# Handwritten OCR (PaddleOCR)
+# Note: paddlepaddle is the CPU build. For GPU inference install
+# paddlepaddle-gpu matching your CUDA version instead.
+paddlepaddle==2.6.2
+paddleocr==2.7.3
+
+# Post-OCR correction
+symspellpy>=6.7.0
 
 # UI
 gradio>=4.0.0

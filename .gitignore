@@ -26,6 +26,9 @@ checkpoints/
 *.pt
 *.pth
 
+# EasyOCR auto-downloads its models on first run — no need to commit them
+models/easyocr/
+
 # Datasets (large — use HuggingFace Datasets or store separately)
 data/raw/
 data/processed/
